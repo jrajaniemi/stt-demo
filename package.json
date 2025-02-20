@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "form-data": "^4.0.2",
     "formidable": "^3.5.2",
     "next": "15.1.7",
     "react": "^19.0.0",

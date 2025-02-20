@@ -5,6 +5,7 @@ import React, { useState, useRef } from 'react';
 export default function Home() {
   const [recording, setRecording] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<any>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -17,7 +18,7 @@ export default function Home() {
       mediaRecorderRef.current.start();
       setRecording(true);
 
-      mediaRecorderRef.current.ondataavailable = event => {
+      mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
@@ -27,24 +28,32 @@ export default function Home() {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioUrl(URL.createObjectURL(blob));
 
-        // Generoidaan tiedostonimi aikaleimalla
+        // Tiedostonimi aikaleimalla
         const timestamp = Date.now();
         const fileName = `audio_${timestamp}.webm`;
 
         const formData = new FormData();
         formData.append('file', blob, fileName);
 
-        await fetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
+        console.log('Lähetettävä FormData:', formData);
 
-        // Tyhjennetään kerätty data
+        try {
+          // Lähetetään POST-pyyntö palvelimelle
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const result = await response.json();
+          setUploadResult(result);
+        } catch (error) {
+          console.error('Virhe lähetyksessä:', error);
+        }
+
+        // Tyhjennetään data ja pysäytetään mikrofoni
         audioChunksRef.current = [];
-
-        // Sammutetaan stream ja mikrofoni
         if (streamRef.current) {
-          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current.getTracks().forEach((track) => track.stop());
           streamRef.current = null;
         }
       };
@@ -72,6 +81,12 @@ export default function Home() {
         <div style={{ marginTop: '1rem' }}>
           <h2>Tallennettu äänitiedosto</h2>
           <audio controls src={audioUrl}></audio>
+        </div>
+      )}
+      {uploadResult && (
+        <div style={{ marginTop: '1rem' }}>
+          <h2>Lähetyksen tulos</h2>
+          <pre>{JSON.stringify(uploadResult, null, 2)}</pre>
         </div>
       )}
     </div>

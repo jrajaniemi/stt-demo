@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PassThrough } from 'stream';
 import fs from 'fs';
 import path from 'path';
-import formidable, { IncomingForm } from 'formidable';
+import { Formidable } from 'formidable';
 
 export const config = {
   api: {
@@ -12,15 +11,12 @@ export const config = {
 
 export async function POST(req: Request) {
   const uploadDir = path.join(process.cwd(), 'uploads');
-
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir);
   }
 
-  // Haetaan pyynnön data binäärimuodossa
   const bodyBuffer = Buffer.from(await req.arrayBuffer());
-
-  // Luodaan PassThrough-stream, johon asetetaan tarvittavat headerit
+  const { PassThrough } = await import('stream');
   const contentType = req.headers.get('content-type') || '';
   const contentLength = req.headers.get('content-length') || '';
   const stream = new PassThrough();
@@ -30,12 +26,13 @@ export async function POST(req: Request) {
   };
   stream.end(bodyBuffer);
 
-  return new Promise<Response>((resolve, reject) => {
-    const form = new IncomingForm({
+  return new Promise<Response>((resolve) => {
+    const form = new Formidable({
       uploadDir,
       keepExtensions: true,
-      filename: (name, ext, part, form) => {
-        // Määritellään tiedostonimeksi haluttu muoto
+      multiples: false,
+      filename: (name, ext, part) => {
+        console.log('Ladattu tiedostonimi:', part.originalFilename);
         return `audio_${Date.now()}${ext}`;
       },
     });
@@ -46,7 +43,40 @@ export async function POST(req: Request) {
         resolve(NextResponse.json({ error: 'Tiedoston tallennuksessa tapahtui virhe' }, { status: 500 }));
         return;
       }
-      resolve(NextResponse.json({ message: 'Tallennus onnistui', file: files.file }));
+
+      console.log('Kentät:', fields);
+      console.log('Tiedostot:', files);
+
+      const uploadedFile = (Object.values(files)[0] as any)?.[0];
+
+      if (!uploadedFile || !uploadedFile.filepath) {
+        console.error('Tiedoston nimeä ei löytynyt ladatusta tiedostosta');
+        resolve(NextResponse.json({ error: 'Tiedoston nimeä ei löytynyt ladatusta tiedostosta' }, { status: 500 }));
+        return;
+      }
+
+      const fileName = path.basename(uploadedFile.filepath);
+      console.log('Tallennettu tiedosto:', fileName);
+
+      const pythonUrl = 'http://localhost:5051/process';
+
+      fetch(pythonUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            resolve(NextResponse.json({ error: 'Python-palvelimen virhe' }, { status: 500 }));
+            return;
+          }
+          const result = await res.json();
+          resolve(NextResponse.json(result));
+        })
+        .catch((error) => {
+          console.error('Python-palvelimeen yhteyden muodostus epäonnistui:', error);
+          resolve(NextResponse.json({ error: 'Python-palvelimeen yhteyden muodostus epäonnistui' }, { status: 500 }));
+        });
     });
   });
 }
