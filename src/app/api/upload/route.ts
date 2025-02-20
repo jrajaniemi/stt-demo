@@ -34,6 +34,10 @@ export async function POST(req: Request) {
     const form = new IncomingForm({
       uploadDir,
       keepExtensions: true,
+      filename: (name, ext, part, form) => {
+        // Määritellään tiedostonimeksi haluttu muoto
+        return `audio_${Date.now()}${ext}`;
+      },
     });
 
     form.parse(stream, (err, fields, files) => {
