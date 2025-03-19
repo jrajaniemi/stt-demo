@@ -14,26 +14,38 @@ export async function GET(request: Request) {
     fs.readdirSync(uploadDir).filter((filename) => filename.endsWith('.txt'))
   );
 
+  let isCancelled = false; // Lippu streamin tilan seuraamiseen
+
   const stream = new ReadableStream({
     start(controller) {
+      // Taulukko käynnissä olevien timeoutien hallintaan
+      const timeouts: NodeJS.Timeout[] = [];
       const watcher = fs.watch(uploadDir, (eventType, filename) => {
         if (filename && filename.endsWith('.txt') && !existingFiles.has(filename)) {
           // Merkitään tiedosto käsitellyksi, jotta samaa tiedostoa ei lähetetä uudelleen
           existingFiles.add(filename);
           const filePath = path.join(uploadDir, filename);
-          // Pieni viive varmistamaan, että tiedosto on kokonaan kirjoitettu
-          setTimeout(() => {
+          // Pieni viive, jotta varmistetaan tiedoston täydellinen kirjoitus
+          const timeoutId = setTimeout(() => {
             fs.readFile(filePath, 'utf8', (err, data) => {
               if (err) return;
-              const sseMessage = `data: ${JSON.stringify({ filename, content: data })}\n\n`;
-              controller.enqueue(new TextEncoder().encode(sseMessage));
+              if (!isCancelled) { // Tarkistetaan, ettei stream ole peruttu
+                try {
+                  controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({ filename, content: data })}\n\n`));
+                } catch (e) {
+                  console.error('Enqueue-virhe:', e);
+                }
+              }
             });
           }, 100);
+          timeouts.push(timeoutId);
         }
       });
 
       controller.oncancel = () => {
+        isCancelled = true;
         watcher.close();
+        timeouts.forEach((t) => clearTimeout(t));
       };
     },
   });

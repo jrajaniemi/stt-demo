@@ -102,16 +102,16 @@ export default function Home() {
       )}
 
       {uploadResult && (
-        <div className="absolute top-10 right-10 text-sm bg-white text-black p-4 rounded shadow">
+        <div className="absolute top-10 right-10 text-sm bg-white text-black p-4 rounded shadow max-w-[50%] break-words">
           <h2 className="font-semibold">Lähetyksen tulos</h2>
           <pre>{JSON.stringify(uploadResult, null, 2)}</pre>
         </div>
       )}
 
       {watchEvent && (
-        <div className="absolute top-10 left-10 text-sm bg-white text-black p-4 rounded shadow">
+        <div className="absolute top-10 left-10 text-sm bg-white text-black p-4 rounded shadow max-w-[50%] break-words">
           <h2 className="font-semibold">Transkriptio</h2>
-          <pre>{watchEvent.content}</pre>
+          <p>{watchEvent.content}</p>
         </div>
       )}
     </div>
