@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       const fileName = path.basename(uploadedFile.filepath);
       console.log('Tallennettu tiedosto:', fileName);
 
-      const pythonUrl = 'http://localhost:5051/process';
+      const pythonUrl = 'http://localhost:4041/process';
 
       fetch(pythonUrl, {
         method: 'POST',
